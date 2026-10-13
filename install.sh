@@ -30,9 +30,11 @@ if [[ -z "$MOLY_DROPBOX_APP" ]]; then
   }
   trap cleanup_dropbox_install EXIT
   if ! curl --fail --silent --show-error --location "$DROPBOX_RELEASE_URL" -o "$MOLY_DMG"; then
-    echo "최신 Dropbox DMG를 가져오지 못했습니다." >&2
-    echo "Dropbox 공식 다운로드 페이지에서 직접 받을 수 있습니다: $DROPBOX_DOWNLOAD_URL" >&2
-    exit 1
+    echo "GitHub에 최신 DMG가 아직 없거나 다운로드할 수 없어 Dropbox 공식 링크에서 받습니다."
+    if ! curl --fail --silent --show-error --location "https://www.dropbox.com/download?plat=mac&full=1" -o "$MOLY_DMG"; then
+      echo "Dropbox DMG를 다운로드하지 못했습니다. 공식 페이지에서 직접 설치해 주세요: $DROPBOX_DOWNLOAD_URL" >&2
+      exit 1
+    fi
   fi
   if ! hdiutil attach "$MOLY_DMG" -quiet -nobrowse -readonly -mountpoint "$MOLY_MOUNT"; then
     echo "Dropbox DMG를 열지 못했습니다. 공식 페이지에서 직접 설치해 주세요: $DROPBOX_DOWNLOAD_URL" >&2
