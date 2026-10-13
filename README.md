@@ -10,7 +10,7 @@ curl -fsSL https://raw.githubusercontent.com/GiyeopKim1993/moly/main/install.sh 
 
 It downloads the generic sync script, restores the items listed in your Dropbox `manifest.json`, then registers a per-user LaunchAgent that copies listed local items to Dropbox every five minutes while you are logged in. If there is no manifest yet, it copies an empty example to Dropbox and exits; add your items, then run the command again.
 
-The Dropbox **Mac desktop app** must be installed, signed in, and syncing the `Mac-Profile-Sync` folder. A Dropbox connection inside ChatGPT does not connect a Mac's local filesystem. If the folder is in a different location, set `MOLY_CLOUD_ROOT` to its local path before running the command.
+The Dropbox **Mac desktop app** must be installed, signed in, and syncing the `Mac-Profile-Sync` folder. If the app is missing, the installer opens Dropbox's official desktop download page and exits; install it, sign in, and rerun the command. If the app is present but the local folder is missing, the installer opens Dropbox and tells you to sign in or enable syncing for that folder, then rerun. It cannot install the app or sign you in automatically; on managed Macs, IT may need to approve installation. A Dropbox connection inside ChatGPT does not connect a Mac's local filesystem. If the folder is in a different location, set `MOLY_CLOUD_ROOT` to its local path before running the command.
 
 ## Manifest format
 
