@@ -8,7 +8,7 @@ Moly restores a small, explicitly allow-listed part of your Mac profile on share
 curl -fsSL https://raw.githubusercontent.com/GiyeopKim1993/moly/main/install.sh | bash
 ```
 
-It downloads the generic sync script, restores the items listed in your Dropbox `manifest.json`, then registers a per-user LaunchAgent that copies listed local items to Dropbox every five minutes while you are logged in. If there is no manifest yet, it copies an empty example to Dropbox and exits; add your items, then run the command again.
+It downloads the generic sync script and, on the first Mac, creates a personal Dropbox `manifest.json` from app bundles in `~/Applications` (excluding Dropbox itself), common shell/Git dotfiles, `Documents`, `Desktop`, and installed Homebrew package lists. It backs up those local items to Dropbox first, then restores and registers a per-user LaunchAgent that backs up every five minutes while you are logged in. Review the generated manifest: app-specific preferences and any other folders you want to sync must be added explicitly because their locations vary by app.
 
 The repository's weekly GitHub Actions workflow downloads Dropbox's current Mac DMG from its official download endpoint and refreshes the `dropbox-latest` release asset. If Dropbox is missing, the setup script downloads that DMG and copies `Dropbox.app` into `~/Applications`, opens it, and exits so you can sign in. Run the one-line setup again after signing in and syncing `Mac-Profile-Sync`. A Dropbox connection inside ChatGPT does not connect a Mac's local filesystem. On managed Macs, installation or updating may still require IT approval. If the folder is in a different location, set `MOLY_CLOUD_ROOT` to its local path before running the command.
 
