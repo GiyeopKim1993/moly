@@ -76,9 +76,60 @@ fi
 curl --fail --silent --show-error --location "$MOLY_RAW/sync.py" -o "$MOLY_HOME/sync.py"
 mkdir -p "$MOLY_CLOUD_ROOT/apps" "$MOLY_CLOUD_ROOT/settings" "$MOLY_CLOUD_ROOT/files"
 if [[ ! -f "$MOLY_CLOUD_ROOT/manifest.json" ]]; then
-  curl --fail --silent --show-error --location "$MOLY_RAW/manifest.example.json" -o "$MOLY_CLOUD_ROOT/manifest.json"
-  echo "Created an empty manifest at $MOLY_CLOUD_ROOT/manifest.json. Add your allow-listed items, then rerun this command."
-  exit 0
+  MOLY_PYTHON="$(command -v python3 || true)"
+  if [[ -z "$MOLY_PYTHON" ]]; then
+    echo "python3 is required to prepare the first backup; install it or ask IT to provide it." >&2
+    exit 1
+  fi
+  "$MOLY_PYTHON" - "$MOLY_CLOUD_ROOT/manifest.json" <<'PY'
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+home = Path.home()
+manifest = {"version": 1, "apps": [], "settings": [], "files": [], "brew_packages": [], "brew_casks": []}
+
+# Back up app bundles directly inside ~/Applications, avoiding nested helper apps.
+applications = home / "Applications"
+if applications.is_dir():
+    for current, dirs, _ in os.walk(applications):
+        for name in list(dirs):
+            if name.endswith(".app"):
+                app = Path(current) / name
+                dirs.remove(name)
+                if name == "Dropbox.app":
+                    continue
+                relative = app.relative_to(applications).as_posix()
+                manifest["apps"].append({"source": f"apps/{relative}", "destination": f"~/Applications/{relative}"})
+
+# Preserve common shell and Git configuration files when they exist.
+for name in (".zshrc", ".zprofile", ".zshenv", ".bash_profile", ".bashrc", ".gitconfig"):
+    if (home / name).is_file() and not (home / name).is_symlink():
+        manifest["settings"].append({"source": f"settings/{name}", "destination": f"~/{name}"})
+
+# These are the conventional locations for durable user documents.
+for name in ("Documents", "Desktop"):
+    path = home / name
+    if path.is_dir() and not path.is_symlink():
+        manifest["files"].append({"source": f"files/{name}", "destination": f"~/{name}"})
+
+brew = shutil.which("brew")
+if not brew:
+    brew = next((str(path) for path in (Path("/opt/homebrew/bin/brew"), Path("/usr/local/bin/brew")) if path.is_file()), None)
+if brew:
+    for key, args in (("brew_packages", ["list", "--formula"]), ("brew_casks", ["list", "--cask"])):
+        result = subprocess.run([brew, *args], text=True, capture_output=True)
+        if result.returncode == 0:
+            manifest[key] = sorted(set(result.stdout.splitlines()))
+
+Path(sys.argv[1]).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+print(f"Created first-run manifest: {len(manifest['apps'])} app(s), {len(manifest['settings'])} shell/Git setting(s), {len(manifest['files'])} file folder(s), and {len(manifest['brew_packages']) + len(manifest['brew_casks'])} Homebrew package(s).")
+PY
+  echo "First Mac setup: backing up this Mac to Dropbox before restoring or enabling periodic sync."
+  "$MOLY_PYTHON" "$MOLY_HOME/sync.py" backup --cloud-root "$MOLY_CLOUD_ROOT"
 fi
 
 MOLY_PYTHON="$(command -v python3 || true)"
