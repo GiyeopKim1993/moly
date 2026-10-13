@@ -3,6 +3,7 @@ set -euo pipefail
 
 MOLY_RAW="https://raw.githubusercontent.com/GiyeopKim1993/moly/main"
 DROPBOX_DOWNLOAD_URL="https://www.dropbox.com/desktop"
+DROPBOX_RELEASE_URL="https://github.com/GiyeopKim1993/moly/releases/latest/download/DropboxInstaller.dmg"
 MOLY_HOME="${HOME}/.local/share/moly"
 MOLY_LOGS="${MOLY_HOME}/logs"
 mkdir -p "$MOLY_HOME" "$MOLY_LOGS"
@@ -16,13 +17,41 @@ for MOLY_APP in "/Applications/Dropbox.app" "$HOME/Applications/Dropbox.app"; do
 done
 
 if [[ -z "$MOLY_DROPBOX_APP" ]]; then
-  echo "Dropbox 데스크톱 앱이 설치되어 있지 않습니다."
-  echo "공식 다운로드 페이지를 엽니다: $DROPBOX_DOWNLOAD_URL"
-  echo "앱을 설치하고 본인 Dropbox 계정으로 로그인한 뒤, 이 명령을 다시 실행하세요."
-  if command -v open >/dev/null 2>&1; then
-    open "$DROPBOX_DOWNLOAD_URL" >/dev/null 2>&1 || true
+  echo "Dropbox 데스크톱 앱이 없습니다. GitHub에 게시된 최신 공식 Dropbox DMG를 받습니다."
+  MOLY_DMG="$(mktemp "${TMPDIR:-/tmp}/DropboxInstaller.XXXXXX.dmg")"
+  MOLY_MOUNT="$(mktemp -d "${TMPDIR:-/tmp}/moly-dropbox.XXXXXX")"
+  MOLY_MOUNTED=0
+  cleanup_dropbox_install() {
+    if [[ "$MOLY_MOUNTED" -eq 1 ]]; then
+      hdiutil detach "$MOLY_MOUNT" -quiet >/dev/null 2>&1 || true
+    fi
+    rm -f "$MOLY_DMG"
+    rmdir "$MOLY_MOUNT" >/dev/null 2>&1 || true
+  }
+  trap cleanup_dropbox_install EXIT
+  if ! curl --fail --silent --show-error --location "$DROPBOX_RELEASE_URL" -o "$MOLY_DMG"; then
+    echo "최신 Dropbox DMG를 가져오지 못했습니다." >&2
+    echo "Dropbox 공식 다운로드 페이지에서 직접 받을 수 있습니다: $DROPBOX_DOWNLOAD_URL" >&2
+    exit 1
   fi
-  exit 1
+  if ! hdiutil attach "$MOLY_DMG" -quiet -nobrowse -readonly -mountpoint "$MOLY_MOUNT"; then
+    echo "Dropbox DMG를 열지 못했습니다. 공식 페이지에서 직접 설치해 주세요: $DROPBOX_DOWNLOAD_URL" >&2
+    exit 1
+  fi
+  MOLY_MOUNTED=1
+  MOLY_APP_SOURCE="$(find "$MOLY_MOUNT" -maxdepth 3 -type d -name Dropbox.app -print -quit)"
+  if [[ -z "$MOLY_APP_SOURCE" ]]; then
+    echo "DMG 안에서 Dropbox.app을 찾지 못했습니다. 공식 페이지에서 직접 설치해 주세요: $DROPBOX_DOWNLOAD_URL" >&2
+    exit 1
+  fi
+  mkdir -p "$HOME/Applications"
+  ditto "$MOLY_APP_SOURCE" "$HOME/Applications/Dropbox.app"
+  cleanup_dropbox_install
+  trap - EXIT
+  MOLY_DROPBOX_APP="$HOME/Applications/Dropbox.app"
+  echo "Dropbox를 ~/Applications에 설치했습니다. 본인 계정으로 로그인하고 동기화 폴더가 준비되면 이 명령을 다시 실행하세요."
+  open -a "$MOLY_DROPBOX_APP" >/dev/null 2>&1 || true
+  exit 0
 fi
 
 if [[ -n "${MOLY_CLOUD_ROOT:-}" ]]; then
